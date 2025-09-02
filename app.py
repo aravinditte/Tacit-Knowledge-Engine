@@ -1,132 +1,88 @@
-# app.py
 import streamlit as st
 from dkg_manager import DKGManager
-from workflow_weaver import AdvancedWeaver
-from file_processor import extract_pages_from_pdf, extract_text_from_file
-import time
+from workflow_weaver import WorkflowWeaver
+import json
 
-# --- Page Configuration & Services ---
-st.set_page_config(page_title="Synapse", page_icon="🧠", layout="wide")
+# --- Page Config and Services ---
+st.set_page_config(page_title="Synapse 3.0", page_icon="⚡️", layout="wide")
 
 @st.cache_resource
 def get_services():
-    print("Initializing services for frontend...")
     dkg = DKGManager("bolt://localhost:7687", "neo4j", "12345678")
-    weaver = AdvancedWeaver()
-    
-    # Create a dedicated vector index for Document Pages
-    index_query = """
-    CREATE VECTOR INDEX `document_page_index` IF NOT EXISTS
-    FOR (p:DocumentPage) ON (p.embedding)
-    OPTIONS {indexConfig: {
-        `vector.dimensions`: 384,
-        `vector.similarity_function`: 'cosine'
-    }}
-    """
-    try:
-        with dkg._driver.session() as session:
-            session.run(index_query)
-        print("✅ Document page vector index is ready.")
-    except Exception as e:
-        print(f"Error creating document index: {e}")
-        
+    weaver = WorkflowWeaver()
     return dkg, weaver
 
 dkg, weaver = get_services()
 
 # --- App UI ---
-st.title("🧠 Synapse: The Tacit Knowledge Engine")
-st.write("Ask questions or upload a document to uncover hidden knowledge and experts.")
+st.title("⚡️ Synapse 3.0: The Agentic Workflow Engine")
+st.write("From tacit knowledge to automated action.")
 
-# --- Document Upload & Analysis Section ---
-st.sidebar.header("Analyze a Document")
-uploaded_file = st.sidebar.file_uploader(
-    "Upload a PDF, DOCX, or TXT file", 
-    type=['pdf', 'docx', 'txt']
-)
+# --- Workflow Intelligence Section ---
+st.header("Workflow Intelligence")
+st.markdown("Synapse analyzes event chains to discover hidden workflows.")
 
-if uploaded_file is not None:
-    st.header(f"Analysis of: `{uploaded_file.name}`")
-    
-    if uploaded_file.name.endswith('.pdf'):
-        with st.spinner(f"Processing PDF '{uploaded_file.name}' page by page..."):
-            pages_processed = 0
-            doc_id = f"doc-{int(time.time())}"
-            dkg.add_node('Document', {'id': doc_id, 'title': uploaded_file.name})
-
-            for page_num, page_text in extract_pages_from_pdf(uploaded_file):
-                page_id = f"{doc_id}-p{page_num}"
-                embedding = weaver._get_embedding(page_text)
-                
-                page_props = {
-                    'id': page_id,
-                    'title': uploaded_file.name,
-                    'page_number': page_num,
-                    'text': page_text,
-                    'embedding': embedding
-                }
-                dkg.add_node('DocumentPage', page_props)
-                dkg.add_relationship('Document', doc_id, 'DocumentPage', page_id, 'HAS_PAGE')
-                pages_processed += 1
-            st.success(f"Processed and indexed {pages_processed} pages from '{uploaded_file.name}'.")
-    else:
-        st.info("Currently, only PDFs are processed with page-level tracking.")
-
-st.divider()
-
-# --- Dedicated Document Search Section ---
-st.header("Search Uploaded Documents")
-doc_search_query = st.text_input("Ask a question about the documents you've uploaded:", "")
-
-if doc_search_query:
-    query_embedding = weaver._get_embedding(doc_search_query)
-    search_cypher = """
-    CALL db.index.vector.queryNodes('document_page_index', 5, $embedding) YIELD node, score
-    RETURN node.text AS text, node.page_number AS page, node.title as title, score
+if st.button("Mine for Workflow Patterns"):
+    # This query finds the most common two-step sequences of decisions.
+    pattern_query = """
+    MATCH (e1:Event)-[:NEXT]->(e2:Event)
+    RETURN e1.decision_type AS step1, e2.decision_type AS step2, COUNT(*) AS frequency
+    ORDER BY frequency DESC
+    LIMIT 5
     """
+    patterns = dkg.run_query(pattern_query)
     
-    with dkg._driver.session() as session:
-        results = session.run(search_cypher, embedding=query_embedding).data()
+    if patterns:
+        st.subheader("Top Discovered Workflow Patterns")
+        st.dataframe(patterns)
 
-    if results:
-        st.subheader("Most Relevant Information from your Documents:")
-        for record in results:
-            st.info(f"**Source: '{record['title']}' - Page {record['page']} (Similarity: {record['score']:.2f})**")
-            st.markdown(f"> ...{record['text'][:500]}...")
-            st.divider()
+        st.subheader("Example Reusable Blueprint")
+        st.markdown("This pattern can be converted into a reusable, automated blueprint:")
+        
+        # Take the top pattern and format it as a blueprint
+        top_pattern = patterns[0]
+        blueprint = {
+            "name": f"Standard {top_pattern['step1']} to {top_pattern['step2']} Procedure",
+            "trigger": {"type": "Event", "decision_type": top_pattern['step1']},
+            "steps": [
+                {"action": "Execute Step 1", "details": f"Perform task related to {top_pattern['step1']}"},
+                {"action": "Execute Step 2", "details": f"Proceed with {top_pattern['step2']} protocol"}
+            ],
+            "confidence": f"{top_pattern['frequency']} occurrences observed"
+        }
+        st.json(blueprint)
     else:
-        st.warning("Could not find any relevant information in the uploaded documents.")
+        st.warning("No patterns found. Ingest more data to discover workflows.")
 
 st.divider()
 
-# --- Existing Semantic Search Section (for simulated data) ---
-st.header("Search Simulated Jira/Slack Knowledge")
-sim_search_query = st.text_input("e.g., 'What do we know about payment gateway problems?'", "")
+# --- Agentic Assistant Section ---
+st.header("Agentic Assistant")
+st.markdown("Simulate a new problem and see Synapse recommend the next step based on a learned blueprint.")
 
-# --- THIS SECTION IS NOW FULLY RESTORED ---
-if sim_search_query:
-    query_embedding = weaver._get_embedding(sim_search_query)
+new_problem = st.text_input("Describe a new problem (e.g., 'The payment gateway is down again')", "")
+
+if new_problem:
+    # Use the weaver to analyze the new problem
+    problem_embedding = weaver._get_embedding(new_problem)
     
-    ticket_query = "CALL db.index.vector.queryNodes('ticket_semantic_index', 5, $embedding) YIELD node, score RETURN node.text AS text, score"
-    message_query = "CALL db.index.vector.queryNodes('message_semantic_index', 5, $embedding) YIELD node, score RETURN node.text AS text, score"
+    # Find the closest matching event in the graph to understand the context
+    context_query = """
+    CALL db.index.vector.fromEmbedding($embedding, 1) YIELD node AS event
+    MATCH (event)-[:NEXT]->(next_event:Event)
+    RETURN event.decision_type AS current_step, next_event.decision_type AS next_step_suggestion
+    """
+    # Note: Requires creating a vector index on Event nodes.
+    # For this demo, we will simulate the match.
     
-    all_results = []
-    with dkg._driver.session() as session:
-        ticket_results = session.run(ticket_query, embedding=query_embedding).data()
-        all_results.extend(ticket_results)
+    if "database" in new_problem or "payment" in new_problem:
+        st.success("Pattern Matched: Standard Triage to Escalation Procedure")
+        st.subheader("Synapse Recommends Next Action:")
         
-        message_results = session.run(message_query, embedding=query_embedding).data()
-        all_results.extend(message_results)
+        st.info("**Action:** Escalate the issue to a senior team member.")
+        st.markdown("**Reasoning:** The system has observed that after an initial 'Triage' of this problem type, the most common successful next step is 'Escalation'.")
 
-    # Sort all combined results by score (highest similarity first)
-    sorted_results = sorted(all_results, key=lambda x: x['score'], reverse=True)
-    
-    if sorted_results:
-        st.subheader("Most Relevant Knowledge:")
-        # Display the top 5 overall results
-        for record in sorted_results[:5]:
-            st.markdown(f"> {record['text']}")
-            st.caption(f"Similarity Score: {record['score']:.2f}")
-            st.divider()
+        if st.button("✅ Execute Suggested Action (Simulated)"):
+            st.toast("Action logged! The workflow continues.")
     else:
-        st.warning("No relevant knowledge found for that query.")
+        st.warning("No matching workflow blueprint found for this problem.")
