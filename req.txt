@@ -1,2 +1,4 @@
 fastapi[all]
 pandas
+scikit-learn
+joblib
