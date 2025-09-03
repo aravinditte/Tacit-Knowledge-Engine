@@ -2,3 +2,4 @@ fastapi[all]
 pandas
 scikit-learn
 joblib
+pm4py

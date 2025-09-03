@@ -1,0 +1,92 @@
+:root {
+  /* Global background for the app chrome */
+  --app-bg: #0b1220; /* Very dark blue */
+  --app-panel: #1e293b; /* Dark slate */
+  --app-border: #334155; /* Slate */
+  --app-accent: #22d3ee; /* Bright cyan */
+  --app-accent-2: #60a5fa; /* Bright blue */
+  --app-text-primary: #f1f5f9; /* Off-white, high contrast */
+  --app-text-secondary: #94a3b8; /* Lighter gray for less emphasis, better than opacity */
+
+  /* React Flow variables */
+  --xy-node-background-color-default: #1e293b; /* Dark slate node */
+  --xy-node-border-default: 1px solid #475569; /* Slightly lighter slate border */
+  --xy-node-boxshadow-hover-default: 0 4px 24px rgba(0,0,0,0.3);
+  --xy-edge-stroke-default: #475569; /* Slate gray edge color */
+  --xy-controls-button-background-color-default: #1e293b;
+  --xy-controls-button-border-color-default: #475569;
+  --xy-controls-button-color-default: #cbd5e1;
+  --xy-minimap-background-color-default: #0f172a;
+}
+
+/* Add a subtle glow to selected or hovered nodes for better focus */
+.react-flow__node.selected, .react-flow__node:hover {
+  --xy-node-boxshadow-default: 0 0 20px rgba(34, 211, 238, 0.2);
+  --xy-node-border-default: 1px solid var(--app-accent);
+}
+
+
+html, body, #root {
+  height: 100%;
+}
+
+.app-shell {
+  height: 100vh;
+  width: 100vw;
+  background: var(--app-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--app-border);
+  background: linear-gradient(180deg, rgba(34,211,238,0.04), rgba(96,165,250,0.04));
+}
+
+.app-title {
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--app-text-primary);
+}
+
+.app-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  /* Using a specific color is better for readability than using opacity */
+  color: var(--app-text-secondary);
+}
+
+.flow-wrap {
+  flex: 1;
+}
+
+.panel {
+  background: var(--app-panel);
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  padding: 8px;
+  display: flex;
+  gap: 8px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+}
+
+.btn {
+  color: var(--app-text-primary);
+  background: transparent;
+  border: 1px solid var(--app-border);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn:hover {
+  border-color: var(--app-accent-2);
+  color: var(--app-accent-2);
+}
+.btn-active {
+  border-color: var(--app-accent);
+  color: var(--app-accent);
+  background-color: rgba(34, 211, 238, 0.1);
+}
