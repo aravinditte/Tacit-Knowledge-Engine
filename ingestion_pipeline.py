@@ -1,39 +1,36 @@
 from dkg_manager import DKGManager
 from workflow_weaver import WorkflowWeaver
+from connectors import fetch_jira_data, fetch_slack_data
+
+USER_REGISTRY = {
+    'jane.doe@example.com': {"consent": True, "role": "Senior Engineer"},
+    'bob.smith@example.com': {"consent": True, "role": "DBA"}
+}
 
 def run_ingestion():
-    """Wipes the database and ingests simulated logs as workflow event chains."""
     dkg = DKGManager("bolt://localhost:7687", "neo4j", "12345678")
     weaver = WorkflowWeaver()
 
-    # Clear old data for a fresh start
-    print("Wiping database...")
+    print("Wiping database for fresh ingestion...")
     dkg.run_query("MATCH (n) DETACH DELETE n")
     
-    # A log of events in chronological order for a single ticket
-    simulated_log = [
-        {
-            'type': 'jira_comment', 'user_name': 'Jane Doe', 'ticket_id': 'PROJ-123',
-            'text': "This looks like a 'database lock' issue. I've seen this before. Pinging @bob.smith to confirm."
-        },
-        {
-            'type': 'slack_message', 'user_name': 'Bob Smith', 'ticket_id': 'PROJ-123',
-            'text': "Confirmed. The 'database lock' is the root cause for PROJ-123. Escalating to SRE."
-        },
-        {
-            'type': 'jira_comment', 'user_name': 'Jane Doe', 'ticket_id': 'PROJ-123',
-            'text': "Thanks Bob. Applying the hotfix now. This issue is resolved."
-        }
-    ]
+    all_events = fetch_jira_data() + fetch_slack_data()
+    all_events.sort(key=lambda x: x['text'])
 
-    print("Ingesting simulated event log...")
-    for entry in simulated_log:
-        chain_id, event_props = weaver.process_log_entry(entry)
-        if chain_id and event_props:
-            print(f"  -> Adding Event: {event_props['decision_type']} by {event_props['user']}")
-            dkg.add_event_to_chain(chain_id, event_props)
+    print("Ingesting events based on user consent...")
+    for entry in all_events:
+        user_email = entry.get('user_email')
+        if USER_REGISTRY.get(user_email, {}).get("consent"):
+            user_role = USER_REGISTRY[user_email].get("role", "Employee")
+            chain_id, event_props = weaver.process_log_entry(entry, user_role)
+            
+            if chain_id and event_props:
+                print(f"  -> Adding Event: {event_props['decision_type']} from {event_props['source']} by {user_role}")
+                dkg.add_event_to_chain(chain_id, event_props)
+        else:
+            print(f"  -> SKIPPING Event: No consent from {entry.get('user_name')}")
 
-    print("✅ Ingestion complete. Workflow chains have been built.")
+    print("✅ Passive observation ingestion complete.")
     dkg.close()
 
 if __name__ == "__main__":

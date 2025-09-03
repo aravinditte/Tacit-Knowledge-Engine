@@ -11,4 +11,4 @@ class DecisionClarificationBot:
             options = ["", "Code Hotfix", "Configuration Change", "Manual Data Correction", "User Training"]
             return {"prompt": prompt, "options": options, "event_id": event_node['id']}
             
-        return None 
+        return None # No prompt needed for this event

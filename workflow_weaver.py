@@ -14,10 +14,7 @@ class WorkflowWeaver:
         return self.model.encode(text).tolist()
 
     def _extract_decision_point(self, text):
-        """
-        Simulated LLM analysis to determine the 'why' behind an action.
-        This is a key feature for capturing reasoning patterns.
-        """
+        """Simulated LLM analysis to determine the 'why' behind an action."""
         text_lower = text.lower()
         if "confirm" in text_lower or "looks like" in text_lower or "root cause" in text_lower:
             return {"type": "Triage", "reason": "Identifying root cause."}
@@ -27,25 +24,22 @@ class WorkflowWeaver:
             return {"type": "Resolution", "reason": "Implementing a fix."}
         return {"type": "Discussion", "reason": "General comment."}
 
-    def process_log_entry(self, log_data):
-        """Processes a single log entry (e.g., a comment) as a workflow event."""
+    def process_log_entry(self, log_data, user_role):
+        """Processes a single log entry as a workflow event, including the user's role."""
         text = log_data.get('text', '')
-        
-        # Extract decision-making context
         decision = self._extract_decision_point(text)
         
         event_props = {
             "id": str(uuid.uuid4()),
             "timestamp": int(time.time()),
-            "source": log_data.get('type'), # 'jira_comment', 'slack_message'
+            "source": log_data.get('source'),
             "user": log_data.get('user_name'),
+            "user_role": user_role,
             "text": text,
             "decision_type": decision['type'],
             "reasoning": decision['reason'],
             "embedding": self._get_embedding(text)
         }
         
-        # The 'chain_id' is the ticket ID, linking all events for that ticket together.
         chain_id = log_data.get('ticket_id')
-        
         return chain_id, event_props

@@ -1,88 +1,43 @@
 import streamlit as st
 from dkg_manager import DKGManager
 from workflow_weaver import WorkflowWeaver
-import json
+from synapse_bots import DecisionClarificationBot
 
-# --- Page Config and Services ---
-st.set_page_config(page_title="Synapse 3.0", page_icon="⚡️", layout="wide")
+st.set_page_config(page_title="Synapse Dashboard", page_icon="🚀", layout="wide")
 
 @st.cache_resource
 def get_services():
     dkg = DKGManager("bolt://localhost:7687", "neo4j", "12345678")
     weaver = WorkflowWeaver()
-    return dkg, weaver
+    bot = DecisionClarificationBot()
+    return dkg, weaver, bot
 
-dkg, weaver = get_services()
+dkg, weaver, bot = get_services()
 
-# --- App UI ---
-st.title("⚡️ Synapse 3.0: The Agentic Workflow Engine")
-st.write("From tacit knowledge to automated action.")
+st.title("🚀 Synapse: The Tacit Knowledge Engine")
+st.markdown("Welcome to the central dashboard. Navigate to different modules using the sidebar.")
 
-# --- Workflow Intelligence Section ---
-st.header("Workflow Intelligence")
-st.markdown("Synapse analyzes event chains to discover hidden workflows.")
+st.header("🔔 Interactive Learning Center")
+st.markdown("Synapse occasionally asks for clarification to enrich its knowledge. Your input makes the system smarter.")
 
-if st.button("Mine for Workflow Patterns"):
-    # This query finds the most common two-step sequences of decisions.
-    pattern_query = """
-    MATCH (e1:Event)-[:NEXT]->(e2:Event)
-    RETURN e1.decision_type AS step1, e2.decision_type AS step2, COUNT(*) AS frequency
-    ORDER BY frequency DESC
-    LIMIT 5
-    """
-    patterns = dkg.run_query(pattern_query)
-    
-    if patterns:
-        st.subheader("Top Discovered Workflow Patterns")
-        st.dataframe(patterns)
+recent_events_query = "MATCH (e:Event) RETURN e ORDER BY e.timestamp DESC LIMIT 5"
+recent_events = dkg.run_query(recent_events_query)
 
-        st.subheader("Example Reusable Blueprint")
-        st.markdown("This pattern can be converted into a reusable, automated blueprint:")
+if recent_events:
+    for event_data in recent_events:
+        event = event_data['e']
+        prompt_data = bot.analyze_event_and_prompt(event)
         
-        # Take the top pattern and format it as a blueprint
-        top_pattern = patterns[0]
-        blueprint = {
-            "name": f"Standard {top_pattern['step1']} to {top_pattern['step2']} Procedure",
-            "trigger": {"type": "Event", "decision_type": top_pattern['step1']},
-            "steps": [
-                {"action": "Execute Step 1", "details": f"Perform task related to {top_pattern['step1']}"},
-                {"action": "Execute Step 2", "details": f"Proceed with {top_pattern['step2']} protocol"}
-            ],
-            "confidence": f"{top_pattern['frequency']} occurrences observed"
-        }
-        st.json(blueprint)
-    else:
-        st.warning("No patterns found. Ingest more data to discover workflows.")
-
-st.divider()
-
-# --- Agentic Assistant Section ---
-st.header("Agentic Assistant")
-st.markdown("Simulate a new problem and see Synapse recommend the next step based on a learned blueprint.")
-
-new_problem = st.text_input("Describe a new problem (e.g., 'The payment gateway is down again')", "")
-
-if new_problem:
-    # Use the weaver to analyze the new problem
-    problem_embedding = weaver._get_embedding(new_problem)
-    
-    # Find the closest matching event in the graph to understand the context
-    context_query = """
-    CALL db.index.vector.fromEmbedding($embedding, 1) YIELD node AS event
-    MATCH (event)-[:NEXT]->(next_event:Event)
-    RETURN event.decision_type AS current_step, next_event.decision_type AS next_step_suggestion
-    """
-    # Note: Requires creating a vector index on Event nodes.
-    # For this demo, we will simulate the match.
-    
-    if "database" in new_problem or "payment" in new_problem:
-        st.success("Pattern Matched: Standard Triage to Escalation Procedure")
-        st.subheader("Synapse Recommends Next Action:")
-        
-        st.info("**Action:** Escalate the issue to a senior team member.")
-        st.markdown("**Reasoning:** The system has observed that after an initial 'Triage' of this problem type, the most common successful next step is 'Escalation'.")
-
-        if st.button("✅ Execute Suggested Action (Simulated)"):
-            st.toast("Action logged! The workflow continues.")
-    else:
-        st.warning("No matching workflow blueprint found for this problem.")
+        if prompt_data:
+            st.info(f"**Action by {event['user_role']} ('{event['user']}')**: {event['text']}")
+            
+            with st.form(key=f"form_{event['id']}"):
+                clarification = st.selectbox(prompt_data['prompt'], options=prompt_data['options'])
+                submitted = st.form_submit_button("Submit Clarification")
+                
+                if submitted and clarification:
+                    dkg.update_event_with_clarification(event['id'], clarification)
+                    st.success("Thank you! Your knowledge has been captured.")
+                    st.rerun()
+else:
+    st.write("No events requiring clarification at this time.")

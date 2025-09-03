@@ -18,7 +18,6 @@ class DKGManager:
     def add_event_to_chain(self, chain_id, event_props):
         """Adds a new event to a workflow chain, linking it to the previous event."""
         with self._driver.session() as session:
-            # This complex transaction finds the last event in the chain and links the new one.
             session.write_transaction(self._create_and_link_event, chain_id, event_props)
 
     @staticmethod
@@ -37,10 +36,7 @@ class DKGManager:
         last_event_node = result.single()
 
         # Create the new event
-        new_event_query = """
-        CREATE (newEvent:Event $props)
-        RETURN newEvent
-        """
+        new_event_query = "CREATE (newEvent:Event $props) RETURN newEvent"
         new_event_result = tx.run(new_event_query, props=event_props)
         new_event_node = new_event_result.single()[0]
 
@@ -59,3 +55,13 @@ class DKGManager:
             MERGE (c)-[:HAS_EVENT]->(e)
             """
             tx.run(link_query, chain_id=chain_id, event_id=new_event_node['id'])
+
+    def update_event_with_clarification(self, event_id, clarification_text):
+        """Adds user-provided clarification to an event node."""
+        query = """
+        MATCH (e:Event {id: $event_id})
+        SET e.clarification = $clarification_text
+        """
+        with self._driver.session() as session:
+            session.run(query, event_id=event_id, clarification_text=clarification_text)
+        print(f"Updated event {event_id} with clarification.")
